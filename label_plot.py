@@ -314,8 +314,6 @@ class label_tool(qtw.QWidget):
             # get list of epoch files in the data folder
             self.epoch_list = [item for item in os.listdir(self.data_directory) if item.endswith("-epo.fif")]
 
-            # todo: randomize the epoch list and split into train and test
-
             # label_bt enable
             self.submit_bt.setEnabled(True)
             self.label_combo.setEnabled(True)
