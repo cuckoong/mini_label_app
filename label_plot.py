@@ -197,9 +197,17 @@ class label_tool(qtw.QWidget):
         self.label_combo.setEnabled(False)
 
         # get the selected label2
-        self.label = self.label_combo.currentText()
-        print(self.label)
+        selected_label = self.label_combo.currentText()
+        print(selected_label)
 
+        # save the label to the label file
+        self._add_label_record(selected_label)
+
+        # enable previous and next button
+        self.previous_bt.setEnabled(True)
+        self.next_bt.setEnabled(True)
+
+    def _add_label_record(self, label):
         # write the epoch_index and label to json file
         with open(self.label_file, 'r') as f:
             self.label_dict = json.load(f)
@@ -209,15 +217,11 @@ class label_tool(qtw.QWidget):
             self.label_dict[self.user_name] = {}
 
         # add label to the dict
-        self.label_dict[self.user_name][self.epoch_index] = self.label
+        self.label_dict[self.user_name][self.epoch_index] = label
 
         # record to json file
         with open(self.label_file, 'w') as f:
             json.dump(self.label_dict, f)
-
-        # enable previous and next button
-        self.previous_bt.setEnabled(True)
-        self.next_bt.setEnabled(True)
 
     def _clear_plot_widget(self):
         # clear the plot widget
@@ -225,6 +229,8 @@ class label_tool(qtw.QWidget):
             self.epoch_plot_layout.itemAt(i).widget().setParent(None)
 
     def _set_new_plot_widget(self, epoch_index):
+        self.epoch_index = epoch_index
+
         # load next epoch file
         raw_data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[epoch_index]), preload=True)
 
@@ -241,40 +247,42 @@ class label_tool(qtw.QWidget):
         # self.filtered_data_plot.setData(x=np.arange(0, len(filtered_data)), y=filtered_data)
 
         # add new plot widget to the layout
-        self.filtered_data_plot_widget = qtw.QWidget()
         filtered_data = raw_data.copy().filter(l_freq=4, h_freq=45, method="iir")
         self.filtered_data_plot_widget = filtered_data.plot(block=False, show=False, theme="light")
 
         # add new psd widget
-        # psd_data = get_psd(filtered_data)
-        # self.psd_plot_widget = pg.PlotWidget()
-        # self.psd_plot_widget.setBackground("w")
-        # pen = pg.mkPen(color=(0, 0, 0), width=3, style=qtc.Qt.SolidLine)
-        # self.psd_plot = self.psd_plot_widget.plot(pen=pen, name="psd")
-        # self.psd_plot.setData(x=np.arange(0, len(psd_data)), y=psd_data)
-        self.psd_plot_widget = qtw.QWidget()
-        self.psd_plot_widget = filtered_data.compute_psd(fmin=4, fmax=45).plot()
+        self.psd_plot_widget = pg.PlotWidget()
+        self.psd_plot_widget.setBackground("w")
+        pen = pg.mkPen(color=(0, 0, 0), width=3, style=qtc.Qt.SolidLine)
+        self.psd_plot = self.psd_plot_widget.plot(pen=pen, name="psd")
+        self.psd_plot_widget.setXRange(4, 45)
+
+        psd_data, freqs = mne.time_frequency.psd_welch(filtered_data, fmin=4, fmax=45, n_fft=len(filtered_data.times))
+        self.psd_plot.setData(x=freqs, y=psd_data[0, 0, :])
 
         # group three plot widgets
-        self.epoch_plot_layout.addWidget(self.data_plot_widget, 0, 0)
-        self.epoch_plot_layout.addWidget(self.filtered_data_plot_widget, 1, 0)
-        self.epoch_plot_layout.addWidget(self.psd_plot_widget, 2, 0)
+        # add text
+        self.epoch_plot_layout.addWidget(qtw.QLabel("Raw Data"), 0, 0, 1, 1)
+        self.epoch_plot_layout.addWidget(self.data_plot_widget, 1, 0)
+
+        self.epoch_plot_layout.addWidget(qtw.QLabel("Filtered Data"), 2, 0, 1, 1)
+        self.epoch_plot_layout.addWidget(self.filtered_data_plot_widget, 3, 0)
+
+        self.epoch_plot_layout.addWidget(qtw.QLabel("PSD"), 4, 0, 1, 1)
+        self.epoch_plot_layout.addWidget(self.psd_plot_widget, 5, 0)
 
     def _previous_bt_clicked(self):
         # back to previous epoch
         # enable submit button
         self.submit_bt.setEnabled(True)
         self.label_combo.setEnabled(True)
-        # load next epoch file
-        # open the next plot
-        self.data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[0]))
-        self.epoch_index = self.epoch_list[0].split("-")[0]
 
         # change the plot widget
-        self._clear_plot_widgt()
+        self._clear_plot_widget()
 
         # add new plot widget
-        self._set_new_plot_widget()
+        # todo: update epoch_index
+        self._set_new_plot_widget(epoch_index=1)
 
         # show the epoch plots
         self.epoch_plot_widget.show()
@@ -284,16 +292,13 @@ class label_tool(qtw.QWidget):
         # enable submit button
         self.submit_bt.setEnabled(True)
         self.label_combo.setEnabled(True)
-        # load next epoch file
-        # open the next plot
-        self.data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[1]))
 
-        self.epoch_index = self.epoch_list[1].split("-")[0]
         # change the plot widget
-        self._clear_plot_widgt()
+        self._clear_plot_widget()
 
         # add new plot widget
-        self._set_new_plot_widget()
+        # todo: update epoch_index
+        self._set_new_plot_widget(2)
 
         # show the epoch plots
         self.epoch_plot_widget.show()
@@ -318,23 +323,30 @@ class label_tool(qtw.QWidget):
             self.submit_bt.setEnabled(True)
             self.label_combo.setEnabled(True)
 
+            # change the plot widget
+            self._clear_plot_widget()
+
             # load the epoch file
             self._set_new_plot_widget(0)
 
             self.epoch_plot_widget.show()
 
-            # create label file inside current folder
-            # self.label_file = "label.json".format(self.user_name)
-            # if not os.path.exists(self.label_file):
-            #     with open(self.label_file, 'w') as f:
-            #         json.dump({}, f)
-            # else:
-            #     with open(self.label_file, 'r') as f:
-            #         self.label_dict = json.load(f)
+            # get label record files
+            self._label_records()
 
         else:
             self.import_folder_bt.setStyleSheet("background-color: red")
             self.import_folder_confirm_bt.setEnabled(True)
+
+    def _label_records(self):
+        # create label file inside current folder
+        self.label_file = "label.json"
+        if not os.path.exists(self.label_file):
+            with open(self.label_file, 'w') as f:
+                json.dump('{}', f)
+
+        with open(self.label_file, 'r') as f:
+            self.label_dict = json.load(f)
 
     def closeEvent(self, event):
         reply = qtw.QMessageBox.question(self, 'Message', 'Are you sure to close this window?',
