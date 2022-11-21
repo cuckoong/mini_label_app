@@ -3,10 +3,34 @@ import os
 
 import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
-import PyQt5.QtGui as qtg
+import pyqtgraph as pg
+
 import mne
+import numpy as np
+from scipy import signal, fft
 
 import json
+
+
+def get_psd(data, sfreq=500.5):
+    """
+    :param sfreq: default 500.5
+    :param data: data (type: deque after filtering, unit: microV), use last 5s data for PSD
+    :return: power spectral density in microV^2/Hz
+    """
+    data = np.array(data).reshape(-1)
+
+    # hanning window
+    window = signal.windows.hann(len(data))
+    data = window * data
+
+    # fft
+    fft_data = fft.fft(data)
+
+    # power spectral density
+    psd_data = np.abs(fft_data) ** 2 / len(data) / sfreq
+    psd_data = 10 * np.log10(psd_data[0:int(len(psd_data) / 2)])
+    return psd_data
 
 
 class label_tool(qtw.QWidget):
@@ -156,8 +180,8 @@ class label_tool(qtw.QWidget):
         self.next_bt.clicked.connect(self._next_bt_clicked)
 
         # add button and combo to the widget
-        self.label_layout.addWidget(self.submit_bt, 0, 0)
-        self.label_layout.addWidget(self.label_combo, 0, 1)
+        self.label_layout.addWidget(self.label_combo, 0, 0)
+        self.label_layout.addWidget(self.submit_bt, 0, 1)
         self.label_layout.addWidget(self.previous_bt, 1, 0)
         self.label_layout.addWidget(self.next_bt, 1, 1)
 
@@ -189,27 +213,60 @@ class label_tool(qtw.QWidget):
         self.previous_bt.setEnabled(True)
         self.next_bt.setEnabled(True)
 
+    def _clear_plot_widget(self):
+        # clear the plot widget
+        for i in reversed(range(self.epoch_plot_layout.count())):
+            self.epoch_plot_layout.itemAt(i).widget().setParent(None)
+
+    def _set_new_plot_widget(self, epoch_index):
+        # load next epoch file
+        raw_data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[epoch_index]), preload=True)
+
+        # add new plot widget
+        self.data_plot_widget = raw_data.plot(block=False, show=False, theme="light")
+
+        # # add new filtered data widget
+        # filtered_data = get_filter_data(data=raw_data.get_data(), notch_value=50, filter_list=[4, 45], fs=500.5)
+        # # qt line plot
+        # self.filtered_data_plot_widget = pg.PlotWidget()
+        # self.filtered_data_plot_widget.setBackground("w")
+        # pen = pg.mkPen(color=(0, 0, 0), width=3, style=qtc.Qt.SolidLine)
+        # self.filtered_data_plot = self.filtered_data_plot_widget.plot(pen=pen, name="filtered_data")
+        # self.filtered_data_plot.setData(x=np.arange(0, len(filtered_data)), y=filtered_data)
+
+        # add new plot widget to the layout
+        self.filtered_data_plot_widget = qtw.QWidget()
+        filtered_data = raw_data.copy().filter(l_freq=4, h_freq=45, method="iir")
+        self.filtered_data_plot_widget = filtered_data.plot(block=False, show=False, theme="light")
+
+        # add new psd widget
+        # psd_data = get_psd(filtered_data)
+        # self.psd_plot_widget = pg.PlotWidget()
+        # self.psd_plot_widget.setBackground("w")
+        # pen = pg.mkPen(color=(0, 0, 0), width=3, style=qtc.Qt.SolidLine)
+        # self.psd_plot = self.psd_plot_widget.plot(pen=pen, name="psd")
+        # self.psd_plot.setData(x=np.arange(0, len(psd_data)), y=psd_data)
+        self.psd_plot_widget = qtw.QWidget()
+        self.psd_plot_widget = filtered_data.compute_psd(fmin=4, fmax=45).plot()
+
+        # group three plot widgets
+        self.epoch_plot_layout.addWidget(self.data_plot_widget, 0, 0)
+        self.epoch_plot_layout.addWidget(self.filtered_data_plot_widget, 1, 0)
+        self.epoch_plot_layout.addWidget(self.psd_plot_widget, 2, 0)
+
     def _previous_bt_clicked(self):
         # enable submit button
         self.submit_bt.setEnabled(True)
         self.label_combo.setEnabled(True)
-        # load next epoch file
-        # open the next plot
-        self.data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[0]))
+
         # change the plot widget
-        for i in reversed(range(self.epoch_plot_layout.count())):
-            self.epoch_plot_layout.itemAt(i).widget().setParent(None)
+        self._clear_plot_widgt()
 
-        self.data_plot_widget = self.data.plot(block=False, show=False, theme="light")
-        self.epoch_plot_layout.addWidget(self.data_plot_widget, 0, 0)
+        # add new plot widget
+        self._set_new_plot_widget()
+
+        # show the epoch plots
         self.epoch_plot_widget.show()
-
-        self.setLayout(self.layout)
-        self.setStyleSheet('''
-                        QTabWidget::tab-bar {
-                            alignment: center;
-                        }''')
-
 
     def _next_bt_clicked(self):
         # enable submit button
@@ -218,19 +275,15 @@ class label_tool(qtw.QWidget):
         # load next epoch file
         # open the next plot
         self.data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[1]))
+
         # change the plot widget
-        for i in reversed(range(self.epoch_plot_layout.count())):
-            self.epoch_plot_layout.itemAt(i).widget().setParent(None)
+        self._clear_plot_widgt()
 
-        self.data_plot_widget = self.data.plot(block=False, show=False, theme="light")
-        self.epoch_plot_layout.addWidget(self.data_plot_widget, 0, 0)
+        # add new plot widget
+        self._set_new_plot_widget()
+
+        # show the epoch plots
         self.epoch_plot_widget.show()
-
-        self.setLayout(self.layout)
-        self.setStyleSheet('''
-                QTabWidget::tab-bar {
-                    alignment: center;
-                }''')
 
     def _import_data_folder(self):
         # get data folder
@@ -252,22 +305,18 @@ class label_tool(qtw.QWidget):
             self.submit_bt.setEnabled(True)
             self.label_combo.setEnabled(True)
 
-            # load the first epoch file
-            self.data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[0]))
+            self._set_new_plot_widget(0)
 
-            # change the plot widget
-            self.data_plot_widget = self.data.plot(block=False, show=False, theme="light")
-            self.epoch_plot_layout.addWidget(self.data_plot_widget, 0, 0)
             self.epoch_plot_widget.show()
 
             # create label file inside current folder
-            self.label_file = "label.json".format(self.user_name)
-            if not os.path.exists(self.label_file):
-                with open(self.label_file, 'w') as f:
-                    json.dump({}, f)
-            else:
-                with open(self.label_file, 'r') as f:
-                    self.label_dict = json.load(f)
+            # self.label_file = "label.json".format(self.user_name)
+            # if not os.path.exists(self.label_file):
+            #     with open(self.label_file, 'w') as f:
+            #         json.dump({}, f)
+            # else:
+            #     with open(self.label_file, 'r') as f:
+            #         self.label_dict = json.load(f)
 
         else:
             self.import_folder_bt.setStyleSheet("background-color: red")
