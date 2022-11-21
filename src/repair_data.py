@@ -165,7 +165,7 @@ class MA():
         return self.raw
 
 
-def repairedData(raw, threshold=100, is_plot=False):
+def repairedData(raw, threshold=100, is_plot=False, repaired_data_file=None):
     """
     Repair the data, remove the deviate points from online data.
     param threshold: how many std away from the mean
@@ -194,11 +194,11 @@ def repairedData(raw, threshold=100, is_plot=False):
             print(raw.info['subject_info']['filename'])
 
             # log into json file
-            with open('repaired_data.json', 'r') as f:
+            with open(repaired_data_file, 'r') as f:
                 repaired_data_log = json.load(f)
 
             repaired_data_log[raw.info['subject_info']['filename']] = True
-            with open('repaired_data.json', 'w') as f:
+            with open(repaired_data_file, 'w') as f:
                 json.dump(repaired_data_log, f)
 
             if idx != 0:
@@ -284,8 +284,18 @@ if __name__ == '__main__':
     record_dataframe = pd.read_csv('/Users/panpan/PycharmProjects/label_gui/data/sample_data_record.csv')
 
     # create a json file to log the repaired data
+    repaired_data_file = os.path.join(processed_wkdir, 'metadata', 'repaired_data.json')
+
+    #
+    if os.path.exists(repaired_data_file):
+        # delete the file
+        os.remove(repaired_data_file)
+    with open(repaired_data_file, 'w') as f:
+        json.dump({}, f)
+
+    # create a json file to log the repaired data
     repaired_data_log = {}
-    json_file = os.path.join(processed_wkdir, 'epochs', 'metadata.json')
+    json_file = os.path.join(processed_wkdir, 'metadata', 'epoch_info.json')
     with open(json_file, 'w') as f:
         json.dump(repaired_data_log, f)
 
@@ -296,7 +306,6 @@ if __name__ == '__main__':
         shutil.rmtree(epoch_folder)
     os.mkdir(epoch_folder)
 
-    epoch_index = 0
     for task in tasks:
         # get eeg file path
         dir_ma = os.path.join(wkdir, task)
@@ -308,7 +317,7 @@ if __name__ == '__main__':
             raw = load_raw(file)
 
             # repair the data
-            repaired_raw = repairedData(raw, is_plot=True)
+            repaired_raw = repairedData(raw, is_plot=True, repaired_data_file=repaired_data_file)
 
             # save the repaired data
             filename = file.split('/')[-1].split('.')[0]
