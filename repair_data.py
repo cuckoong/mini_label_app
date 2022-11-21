@@ -1,4 +1,5 @@
 import os
+import shutil
 import warnings
 import numpy as np
 import pandas as pd
@@ -253,12 +254,47 @@ def get_raw_stamps(dir_raw, dir_anno, start_timestamp):
     return raw_stamps
 
 
+def log_metadata(json_file, record_df, filename, duration):
+    if not os.path.exists(json_file):
+        with open(json_file, 'w') as f:
+            json.dump({}, f)
+
+    # log the information
+    with open(json_file, 'r') as f:
+        data_log = json.load(f)
+
+    data_log[epoch_index] = {}
+    data_log[epoch_index]['filename'] = filename
+    data_log[epoch_index]['epoch_duration'] = duration
+    data_log[epoch_index]['label'] = filename.split('_')[0]
+    data_log[epoch_index]['subject'] = record_df[record_df['file_name'] == filename]['subject'].values[0]
+
+    with open(json_file, 'w') as f:
+        json.dump(data_log, f)
+
+
 if __name__ == '__main__':
 
     tasks = ['poor_contact', 'eog', 'normal']
     epoch_durations = [1, 2, 4]
-    wkdir = '/Volumes/mindampshared/sample_data/quality_assessment/'
-    processed_wkdir = '/Users/panpan/PycharmProjects/label_gui/Processed_data'
+    wkdir = '/Volumes/mindampshared/quality_assessment/sample_data/raw_data/'
+    processed_wkdir = '/Users/panpan/PycharmProjects/label_gui/Processed_data/'
+
+    # read the repaired data record
+    record_dataframe = pd.read_csv('/Users/panpan/PycharmProjects/label_gui/data/sample_data_record.csv')
+
+    # create a json file to log the repaired data
+    repaired_data_log = {}
+    json_file = os.path.join(processed_wkdir, 'epochs', 'metadata.json')
+    with open(json_file, 'w') as f:
+        json.dump(repaired_data_log, f)
+
+    # create epoch folder for each task
+    epoch_folder = os.path.join(processed_wkdir, 'epochs')
+    if os.path.exists(epoch_folder):
+        # remove the folder if it exists
+        shutil.rmtree(epoch_folder)
+    os.mkdir(epoch_folder)
 
     epoch_index = 0
     for task in tasks:
@@ -272,7 +308,7 @@ if __name__ == '__main__':
             raw = load_raw(file)
 
             # repair the data
-            repaired_raw = repairedData(raw, is_plot=False)
+            repaired_raw = repairedData(raw, is_plot=True)
 
             # save the repaired data
             filename = file.split('/')[-1].split('.')[0]
@@ -289,14 +325,6 @@ if __name__ == '__main__':
 
             else:
                 for duration in epoch_durations:
-                    epoch_folder = os.path.join(processed_wkdir, 'epochs', '{}s'.format(duration))
-                    data_folder = os.path.join(epoch_folder, 'data')
-                    label_folder = os.path.join(epoch_folder, 'labels')
-
-                    for folder in [epoch_folder, data_folder, label_folder]:
-                        if not os.path.exists(folder):
-                            os.makedirs(folder)
-
                     # crop the raw data into epochs with different fixed length
                     for raw in raw_stamps_list:
                         try:
@@ -304,14 +332,12 @@ if __name__ == '__main__':
                         except ValueError:
                             print("Epochs are too short")
                             continue
+
                         for i in range(len(epochs)):
+                            epoch_index = uuid.uuid4().hex
                             # save epoch data
-                            epoch_file_path = os.path.join(data_folder, '{}-epo.fif'.format(epoch_index))
+                            epoch_file_path = os.path.join(processed_wkdir, 'epochs', '{}-epo.fif'.format(epoch_index))
                             epochs[i].save(epoch_file_path, overwrite=True)
 
-                            # save epoch labels
-                            label_file_path = os.path.join(label_folder, '{}-label.json'.format(epoch_index))
-                            with open(label_file_path, 'w') as f:
-                                json.dump({'label': task, 'filename': filename, 'idx': epoch_index}, f)
-                            # next epoch
-                            epoch_index += 1
+                            # log the metadata
+                            log_metadata(json_file, record_dataframe, filename, duration)
