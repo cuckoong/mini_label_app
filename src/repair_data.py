@@ -274,14 +274,15 @@ def log_metadata(json_file, record_df, filename, duration):
 
 
 if __name__ == '__main__':
+    os.chdir(os.path.dirname(os.getcwd()))
 
     tasks = ['poor_contact', 'eog', 'normal']
     epoch_durations = [1, 2, 4]
     wkdir = '/Volumes/mindampshared/quality_assessment/sample_data/raw_data/'
-    processed_wkdir = '/Users/panpan/PycharmProjects/label_gui/Processed_data/'
+    processed_wkdir = 'Processed_data'
 
     # read the repaired data record
-    record_dataframe = pd.read_csv('/Users/panpan/PycharmProjects/label_gui/data/sample_data_record.csv')
+    record_dataframe = pd.read_csv('Data/sample_data_record.csv')
 
     # create a json file to log the repaired data
     repaired_data_file = os.path.join(processed_wkdir, 'metadata', 'repaired_data.json')

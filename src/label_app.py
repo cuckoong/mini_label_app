@@ -37,6 +37,15 @@ def get_psd(data, sfreq=500.5):
     return psd_data
 
 
+def set_line_plot_widget(x, y):
+    line_chart = pg.PlotWidget()
+    line_chart.setBackground('w')
+    pen = pg.mkPen(color=(0, 0, 0), width=3, style=qtc.Qt.SolidLine)
+    line_plot = line_chart.plot(pen=pen)
+    line_plot.setData(x=x, y=y)
+    return line_chart
+
+
 class label_tool(qtw.QWidget):
 
     def __init__(self):
@@ -154,7 +163,6 @@ class label_tool(qtw.QWidget):
             self.user_name = self.user_combo.currentText()
             # enable import folder widget
             self.import_folder_bt.setEnabled(True)
-            self.import_folder_confirm_bt.setEnabled(True)
             # hide user names
             self.user_combo.setEnabled(False)
             # changed to logout
@@ -166,7 +174,6 @@ class label_tool(qtw.QWidget):
             self.data_directory = None
             self.import_folder_bt.setStyleSheet("background-color: white")
             self.import_folder_bt.setEnabled(False)
-            self.import_folder_confirm_bt.setEnabled(False)
             # show user names
             self.user_combo.setEnabled(True)
             # changed to login
@@ -241,7 +248,7 @@ class label_tool(qtw.QWidget):
             self.label_dict = json.load(f)
 
         # add label to the dict
-        file_id = self.epoch_list[self.epoch_index].split('_')[0]
+        file_id = self.epoch_list[self.epoch_index].split('-')[0]
 
         if self.user_name not in self.label_dict:
             self.label_dict[self.user_name] = {}
@@ -269,25 +276,22 @@ class label_tool(qtw.QWidget):
         # load next epoch file
         raw_data = mne.read_epochs(os.path.join(self.data_directory, self.epoch_list[epoch_index]), preload=True)
 
-        # add new plot widget
-        self.data_plot_widget = raw_data.plot(block=False, show=False, theme="light")
+        # add new raw data widget
+        data = raw_data.get_data().flatten()
+        self.data_plot_widget = set_line_plot_widget(x=np.arange(len(data)) / 500.5, y=data)
 
-        # add new plot widget to the layout
+        # add new filtered data widget
         filtered_data = raw_data.copy().filter(l_freq=4, h_freq=45, method="iir")
-        self.filtered_data_plot_widget = filtered_data.plot(block=False, show=False, theme="light")
+        filtered_data_flatten = filtered_data.get_data().flatten()
+        self.filtered_data_plot_widget = set_line_plot_widget(x=np.arange(len(filtered_data_flatten)) / 500.5,
+                                                              y=filtered_data_flatten)
 
         # add new psd widget
-        self.psd_plot_widget = pg.PlotWidget()
-        self.psd_plot_widget.setBackground("w")
-        pen = pg.mkPen(color=(0, 0, 0), width=3, style=qtc.Qt.SolidLine)
-        self.psd_plot = self.psd_plot_widget.plot(pen=pen)
+        psd_data, freqs = mne.time_frequency.psd_welch(filtered_data, fmin=4, fmax=45, n_fft=len(filtered_data.times))
+        self.psd_plot_widget = set_line_plot_widget(x=freqs, y=psd_data.flatten())
         self.psd_plot_widget.setXRange(4, 45)
 
-        psd_data, freqs = mne.time_frequency.psd_welch(filtered_data, fmin=4, fmax=45, n_fft=len(filtered_data.times))
-        self.psd_plot.setData(x=freqs, y=psd_data[0, 0, :])
-
-        # group three plot widgets
-        # add text
+        # add widget to layout
         self.epoch_plot_layout.addWidget(qtw.QLabel("Raw Data"), 0, 0, 1, 1)
         self.epoch_plot_layout.addWidget(self.data_plot_widget, 1, 0)
 
@@ -345,8 +349,11 @@ class label_tool(qtw.QWidget):
         # get data folder
         self.data_directory = qtw.QFileDialog.getExistingDirectory(self, 'Select data folder',
                                                                    'Processed_data/epochs_to_label')
-        self.import_folder_confirm_bt.setEnabled(True)
-        print(self.data_directory)
+
+        if os.path.exists(self.data_directory):
+            self.import_folder_confirm_bt.setEnabled(True)
+        else:
+            self.info.setText("Please select a valid folder")
 
     def _confirm_import_data_folder(self):
         # import_folder_bt turn to green

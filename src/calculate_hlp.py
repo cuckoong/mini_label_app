@@ -28,7 +28,15 @@ def calculate_hlp():
     result_df = pd.merge(result_df, gt_df, left_on='id', right_on='index', how='left')
 
     # calculate hlp for each user
-    (result_df['label_x'] == result_df['label_y']).mean()
+
+    result_df = result_df[result_df['label_y'] != 'eog']
+
+    print('Accuracy ignoring EOG')
+    print((result_df['label_x'] == result_df['label_y']).mean())
+
+    # group by subject
+    print('Accuracy (ignoring EOG) for each subject')
+    print(result_df.groupby('subject').apply(lambda x: (x['label_x'] == x['label_y']).mean()))
 
 
 if __name__ == '__main__':
