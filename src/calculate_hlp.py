@@ -36,7 +36,7 @@ def calculate_hlp():
 
     # group by subject
     print('Accuracy (ignoring EOG) for each subject')
-    print(result_df.groupby('subject').apply(lambda x: (x['label_x'] == x['label_y']).mean()))
+    print(result_df.groupby(['user', 'subject']).apply(lambda x: (x['label_x'] == x['label_y']).mean()))
 
 
 if __name__ == '__main__':
