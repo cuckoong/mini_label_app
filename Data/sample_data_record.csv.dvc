@@ -1,0 +1,5 @@
+outs:
+- md5: be393a2af65079a76b92d60002954bbe
+  size: 5246
+  isexec: true
+  path: sample_data_record.csv

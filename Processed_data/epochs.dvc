@@ -1,0 +1,5 @@
+outs:
+- md5: e72347780ee8ed4d6c9ef6cd84b72a49.dir
+  size: 14613899
+  nfiles: 3019
+  path: epochs
