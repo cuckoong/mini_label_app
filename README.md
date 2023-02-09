@@ -1,5 +1,4 @@
-# mini_label_app
-## mini label app for EEG data
+# mini_label_app for EEG data
 
 1. run sample_data.py to get Processed_data/repaired_raw, which contains repaired raw data, and log the repaired data into Processed_data/metadata/repaired_data.json ; and get the epochs data with 1,2,4s duration and save each epoch into Processed_data/epochs folder, and log the infor into Processed_data/metadata/epochs_info.json;
 
